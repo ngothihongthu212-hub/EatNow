@@ -1,0 +1,8 @@
+{
+  "name": "EatNow – Hệ thống đặt món căn tin",
+  "description": "Hệ thống đặt món trực tuyến tại căn tin, hỗ trợ khách hàng đặt món trước, thanh toán ví CanteenGo, nhân viên xử lý đơn thời gian thực và quản trị viên quản lý thực đơn.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
