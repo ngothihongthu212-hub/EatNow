@@ -15,6 +15,8 @@ import { StaffDashboard } from './components/StaffView/StaffDashboard';
 import { AdminDashboard } from './components/AdminView/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
 import { ToastContainer } from './components/ToastContainer';
+import { OrderReceiptModal } from './components/CustomerView/OrderReceiptModal';
+import { FoodReviewModal } from './components/CustomerView/FoodReviewModal';
 import {
   UtensilsCrossed,
   Clock,
@@ -32,6 +34,10 @@ const MainLayout: React.FC = () => {
     selectedFood,
     selectedOrderForDetail,
     setSelectedOrderForDetail,
+    receiptOrder,
+    setReceiptOrder,
+    reviewingOrder,
+    setReviewingOrder,
   } = useApp();
 
   return (
@@ -178,6 +184,18 @@ const MainLayout: React.FC = () => {
       <WalletModal />
       <UserProfileModal />
       <AuthModal />
+      {receiptOrder && (
+        <OrderReceiptModal
+          order={receiptOrder}
+          onClose={() => setReceiptOrder(null)}
+        />
+      )}
+      {reviewingOrder && (
+        <FoodReviewModal
+          order={reviewingOrder}
+          onClose={() => setReviewingOrder(null)}
+        />
+      )}
       <ToastContainer />
     </div>
   );

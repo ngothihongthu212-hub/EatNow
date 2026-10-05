@@ -15,6 +15,9 @@ import {
   ShoppingBag,
   User,
   ShieldCheck,
+  Printer,
+  UtensilsCrossed,
+  Package,
 } from 'lucide-react';
 
 interface OrderDetailModalProps {
@@ -26,7 +29,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   order,
   onClose,
 }) => {
-  const { cancelOrder, addReview, currentUser } = useApp();
+  const { cancelOrder, addReview, currentUser, setReceiptOrder } = useApp();
 
   // Review state
   const [selectedFoodId, setSelectedFoodId] = useState(order.items[0]?.foodId || '');
@@ -114,12 +117,23 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setReceiptOrder(order)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-xs"
+              title="In phiếu nhận món & Hóa đơn Căn tin"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">In phiếu / Hóa đơn</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -263,9 +277,25 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
               <div className="p-3.5 bg-slate-50 space-y-1 text-xs">
                 <div className="flex justify-between text-slate-500">
+                  <span>Hình thức nhận món:</span>
+                  <span className="font-semibold text-slate-800">
+                    {order.diningOption === 'dine_in'
+                      ? `🍽️ Ăn tại quầy (${order.tableNumber || 'Khu A1'})`
+                      : '🥡 Đóng hộp mang đi'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-slate-500">
                   <span>Phương thức:</span>
                   <span className="font-semibold text-slate-800">Ví CanteenGo</span>
                 </div>
+                {order.discountAmount && order.discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-semibold">
+                    <span>Mã ưu đãi ({order.voucherCode}):</span>
+                    <span className="font-mono-nums">
+                      -{order.discountAmount.toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-slate-500">
                   <span>Trạng thái thanh toán:</span>
                   <span

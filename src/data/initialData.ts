@@ -1,4 +1,4 @@
-import { Category, FoodItem, Order, User, WalletTransaction, Review } from '../types';
+import { Category, FoodItem, Order, User, WalletTransaction, Review, Voucher } from '../types';
 
 export const INITIAL_CATEGORIES: Category[] = [
   {
@@ -1342,3 +1342,40 @@ export const AVAILABLE_PICKUP_SLOTS = [
   '17:15 - 17:30',
   '17:30 - 17:45',
 ];
+
+export const INITIAL_VOUCHERS: Voucher[] = [
+  {
+    code: 'CHAOTAN2026',
+    title: 'Chào đón Tân Sinh Viên',
+    description: 'Giảm ngay 15.000₫ cho đơn từ 35.000₫',
+    discountType: 'fixed',
+    discountValue: 15000,
+    minOrderValue: 35000,
+  },
+  {
+    code: 'EATNOW10',
+    title: 'Ưu đãi Giờ vàng Căn tin',
+    description: 'Giảm 10% tối đa 20.000₫ cho đơn từ 30.000₫',
+    discountType: 'percent',
+    discountValue: 10,
+    minOrderValue: 30000,
+    maxDiscount: 20000,
+  },
+  {
+    code: 'FREESHIP',
+    title: 'Trợ giá Đóng hộp sinh thái',
+    description: 'Giảm 5.000₫ chi phí hộp giấy bảo vệ môi trường',
+    discountType: 'fixed',
+    discountValue: 5000,
+    minOrderValue: 20000,
+  },
+  {
+    code: 'TIETKIEM',
+    title: 'Bữa trưa Tiết kiệm',
+    description: 'Giảm 8.000₫ cho đơn hàng từ 40.000₫',
+    discountType: 'fixed',
+    discountValue: 8000,
+    minOrderValue: 40000,
+  },
+];
+

@@ -10,10 +10,24 @@ import {
   Utensils,
   ChevronRight,
   RotateCcw,
+  Printer,
+  Star,
+  Package,
+  UtensilsCrossed,
+  Tag,
 } from 'lucide-react';
 
 export const MyOrdersView: React.FC = () => {
-  const { orders, currentUser, setSelectedOrderForDetail, setActiveNavTab } = useApp();
+  const {
+    orders,
+    currentUser,
+    setSelectedOrderForDetail,
+    setActiveNavTab,
+    receiptOrder,
+    setReceiptOrder,
+    reviewingOrder,
+    setReviewingOrder,
+  } = useApp();
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
   const myOrders = orders.filter((o) => o.userId === currentUser.id);
@@ -179,11 +193,19 @@ export const MyOrdersView: React.FC = () => {
                   {order.items.map((i) => `${i.name} (x${i.quantity})`).join(', ')}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <div className="flex items-center gap-1 font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md">
                     <Clock className="w-3.5 h-3.5 text-amber-600" />
                     <span>Hẹn lấy món: {order.pickupTimeSlot}</span>
                   </div>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 font-medium text-slate-700">
+                    {order.diningOption === 'dine_in' ? `🍽️ Ăn tại chỗ (${order.tableNumber || 'Khu A1'})` : '🥡 Mang đi'}
+                  </span>
+                  {order.discountAmount && order.discountAmount > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">
+                      🏷️ -{order.discountAmount.toLocaleString('vi-VN')}₫
+                    </span>
+                  )}
                   <span>·</span>
                   <span>
                     Tổng tiền:{' '}
@@ -195,13 +217,32 @@ export const MyOrdersView: React.FC = () => {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {order.status === 'completed' && (
+                  <button
+                    onClick={() => setReviewingOrder(order)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold border border-amber-200 transition-colors"
+                  >
+                    <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-600" />
+                    <span>Đánh giá</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setReceiptOrder(order)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                  title="In phiếu nhận món"
+                >
+                  <Printer className="w-3.5 h-3.5 text-slate-600" />
+                  <span>In vé</span>
+                </button>
+
                 <button
                   onClick={() => setSelectedOrderForDetail(order)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
                 >
                   <Eye className="w-4 h-4 text-amber-400" />
-                  <span>Xem chi tiết & Hóa đơn</span>
+                  <span>Chi tiết</span>
                 </button>
               </div>
             </div>

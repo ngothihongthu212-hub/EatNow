@@ -11,6 +11,11 @@ import {
   ArrowRight,
   Wallet,
   AlertCircle,
+  Tag,
+  Check,
+  UtensilsCrossed,
+  Package,
+  Sparkles,
 } from 'lucide-react';
 import { WalletPaymentModal } from './WalletPaymentModal';
 
@@ -23,14 +28,36 @@ export const CartDrawer: React.FC = () => {
     removeFromCart,
     clearCart,
     cartTotal,
+    finalCartTotal,
     currentUser,
     pickupSlots,
+    vouchers,
+    appliedVoucher,
+    applyVoucher,
+    removeVoucher,
+    voucherDiscount,
+    diningOption,
+    setDiningOption,
+    tableNumber,
+    setTableNumber,
   } = useApp();
 
   const [selectedSlot, setSelectedSlot] = useState(pickupSlots[2] || '11:15 - 11:30');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [voucherInput, setVoucherInput] = useState('');
+  const [showVoucherList, setShowVoucherList] = useState(false);
 
   if (!isCartOpen) return null;
+
+  const handleApplyVoucher = (codeToApply?: string) => {
+    const code = codeToApply || voucherInput;
+    if (!code.trim()) return;
+    const res = applyVoucher(code);
+    if (res.success) {
+      setVoucherInput('');
+      setShowVoucherList(false);
+    }
+  };
 
   return (
     <>
@@ -158,6 +185,60 @@ export const CartDrawer: React.FC = () => {
                   ))}
                 </div>
 
+                {/* Dining Option Selection */}
+                <div className="pt-3 border-t border-slate-200 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <UtensilsCrossed className="w-4 h-4 text-amber-600" />
+                    <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Hình thức nhận món
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDiningOption('takeaway')}
+                      className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                        diningOption === 'takeaway'
+                          ? 'bg-amber-500 border-amber-600 text-slate-950 font-bold shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Package className="w-4 h-4" />
+                      <span>Đóng hộp mang đi</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDiningOption('dine_in')}
+                      className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                        diningOption === 'dine_in'
+                          ? 'bg-amber-500 border-amber-600 text-slate-950 font-bold shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <UtensilsCrossed className="w-4 h-4" />
+                      <span>Ăn tại căn tin</span>
+                    </button>
+                  </div>
+
+                  {diningOption === 'dine_in' && (
+                    <div className="pt-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                        Chọn vị trí ngồi / Quầy nhận món:
+                      </label>
+                      <select
+                        value={tableNumber}
+                        onChange={(e) => setTableNumber(e.target.value)}
+                        className="w-full text-xs p-2 rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/30 font-medium"
+                      >
+                        <option value="Quầy A1 - Bàn 01-05 (Tầng 1)">Quầy A1 - Bàn 01-05 (Tầng 1)</option>
+                        <option value="Quầy A2 - Bàn 06-12 (Tầng 1)">Quầy A2 - Bàn 06-12 (Tầng 1)</option>
+                        <option value="Khu B2 - Bàn Tròn Sinh Viên">Khu B2 - Bàn Tròn Sinh Viên</option>
+                        <option value="Tầng 2 - Khu Vườn Sân Thượng">Tầng 2 - Khu Vườn Sân Thượng</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
                 {/* Pickup Time Slot (US15) */}
                 <div className="pt-3 border-t border-slate-200">
                   <div className="flex items-center gap-2 mb-2">
@@ -190,6 +271,91 @@ export const CartDrawer: React.FC = () => {
                   </p>
                 </div>
 
+                {/* Voucher Section */}
+                <div className="pt-3 border-t border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      <Tag className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Mã giảm giá sinh viên</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowVoucherList(!showVoucherList)}
+                      className="text-xs font-semibold text-amber-700 hover:text-amber-800"
+                    >
+                      {showVoucherList ? 'Thu gọn' : 'Xem mã ưu đãi'}
+                    </button>
+                  </div>
+
+                  {appliedVoucher ? (
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Mã: {appliedVoucher.code}</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-700 font-medium">
+                          {appliedVoucher.title} (-{voucherDiscount.toLocaleString('vi-VN')}₫)
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removeVoucher}
+                        className="px-2 py-1 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-100 transition-colors"
+                      >
+                        Gỡ bỏ
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={voucherInput}
+                        onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+                        placeholder="Nhập mã (vd: CHAOTAN2026)..."
+                        className="flex-1 text-xs px-3 py-2 rounded-xl border border-slate-300 uppercase font-mono font-bold tracking-wider placeholder:normal-case placeholder:font-sans placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleApplyVoucher()}
+                        className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors"
+                      >
+                        Áp dụng
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Suggestion list of vouchers */}
+                  {showVoucherList && (
+                    <div className="space-y-1.5 pt-1">
+                      {vouchers.map((v) => (
+                        <div
+                          key={v.code}
+                          className="p-2 rounded-xl border border-slate-200 bg-white hover:border-amber-400 hover:bg-amber-50/40 transition-all flex items-center justify-between gap-2 text-xs"
+                        >
+                          <div>
+                            <span className="font-mono font-bold text-amber-700 mr-2">
+                              {v.code}
+                            </span>
+                            <span className="text-slate-800 font-medium">{v.title}</span>
+                            <div className="text-[10px] text-slate-500">
+                              {v.description}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleApplyVoucher(v.code)}
+                            disabled={cartTotal < v.minOrderValue}
+                            className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-[11px] shrink-0"
+                          >
+                            Dùng
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Student Info Verification */}
                 <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-amber-900">
@@ -216,6 +382,14 @@ export const CartDrawer: React.FC = () => {
                     {cartTotal.toLocaleString('vi-VN')}₫
                   </span>
                 </div>
+                {voucherDiscount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-semibold">
+                    <span>Giảm giá Voucher ({appliedVoucher?.code}):</span>
+                    <span className="font-mono-nums">
+                      -{voucherDiscount.toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Phí đóng gói & phục vụ:</span>
                   <span className="font-mono-nums font-semibold text-emerald-600">
@@ -225,7 +399,7 @@ export const CartDrawer: React.FC = () => {
                 <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-200">
                   <span>Tổng tiền thanh toán:</span>
                   <span className="text-base font-extrabold font-mono-nums text-amber-600">
-                    {cartTotal.toLocaleString('vi-VN')}₫
+                    {finalCartTotal.toLocaleString('vi-VN')}₫
                   </span>
                 </div>
               </div>

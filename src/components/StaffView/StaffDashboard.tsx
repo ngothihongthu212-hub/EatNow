@@ -15,10 +15,20 @@ import {
   VolumeX,
   Eye,
   RotateCcw,
+  Printer,
+  Package,
+  UtensilsCrossed,
 } from 'lucide-react';
+import { OrderReceiptModal } from '../CustomerView/OrderReceiptModal';
 
 export const StaffDashboard: React.FC = () => {
-  const { orders, updateOrderStatus, setSelectedOrderForDetail } = useApp();
+  const {
+    orders,
+    updateOrderStatus,
+    setSelectedOrderForDetail,
+    receiptOrder,
+    setReceiptOrder,
+  } = useApp();
 
   const [activeTab, setActiveTab] = useState<'pending' | 'preparing' | 'ready' | 'history'>('pending');
   const [searchCode, setSearchCode] = useState('');
@@ -273,23 +283,41 @@ export const StaffDashboard: React.FC = () => {
                 </div>
 
                 {/* Student Info */}
-                <div className="p-4 border-b border-slate-100 bg-slate-50/40 text-xs flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="font-bold text-slate-800 truncate">
-                      {order.userName}
-                    </span>
-                    {order.userClass && (
-                      <span className="text-slate-500 shrink-0">({order.userClass})</span>
-                    )}
+                <div className="p-4 border-b border-slate-100 bg-slate-50/40 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="font-bold text-slate-800 truncate">
+                        {order.userName}
+                      </span>
+                      {order.userClass && (
+                        <span className="text-slate-500 shrink-0">({order.userClass})</span>
+                      )}
+                    </div>
+                    <a
+                      href={`tel:${order.userPhone}`}
+                      className="flex items-center gap-1 text-slate-600 hover:text-amber-600 font-medium shrink-0 font-mono-nums"
+                    >
+                      <Phone className="w-3 h-3 text-slate-400" />
+                      <span>{order.userPhone}</span>
+                    </a>
                   </div>
-                  <a
-                    href={`tel:${order.userPhone}`}
-                    className="flex items-center gap-1 text-slate-600 hover:text-amber-600 font-medium shrink-0 font-mono-nums"
-                  >
-                    <Phone className="w-3 h-3 text-slate-400" />
-                    <span>{order.userPhone}</span>
-                  </a>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                    <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 font-semibold border border-amber-200/60">
+                      {order.diningOption === 'dine_in'
+                        ? `🍽️ Ăn tại quầy (${order.tableNumber || 'Khu A1'})`
+                        : '🥡 Đóng hộp mang đi'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReceiptOrder(order)}
+                      className="flex items-center gap-1 text-slate-600 hover:text-amber-700 font-bold"
+                    >
+                      <Printer className="w-3 h-3" />
+                      <span>In phiếu bếp</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Items in order */}
@@ -451,6 +479,14 @@ export const StaffDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Printable Receipt Modal */}
+      {receiptOrder && (
+        <OrderReceiptModal
+          order={receiptOrder}
+          onClose={() => setReceiptOrder(null)}
+        />
       )}
     </div>
   );

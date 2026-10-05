@@ -74,6 +74,16 @@ export interface OrderItem {
   image: string;
 }
 
+export interface Voucher {
+  code: string;
+  title: string;
+  description: string;
+  discountType: 'fixed' | 'percent';
+  discountValue: number;
+  minOrderValue: number;
+  maxDiscount?: number;
+}
+
 export interface Order {
   id: string;
   orderCode: string; // e.g. EN-9182
@@ -84,6 +94,10 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   pickupTimeSlot: string; // e.g. '11:30 - 11:45'
+  diningOption?: 'dine_in' | 'takeaway';
+  tableNumber?: string;
+  voucherCode?: string;
+  discountAmount?: number;
   status: OrderStatus;
   cancelReason?: string;
   createdAt: string;

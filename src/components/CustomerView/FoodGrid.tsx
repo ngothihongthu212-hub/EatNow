@@ -10,6 +10,10 @@ export const FoodGrid: React.FC = () => {
     searchQuery,
     inStockOnly,
     sortBy,
+    priceFilter,
+    setPriceFilter,
+    healthyOnly,
+    setHealthyOnly,
     setSearchQuery,
     setSelectedCategoryId,
     setInStockOnly,
@@ -36,6 +40,21 @@ export const FoodGrid: React.FC = () => {
     if (inStockOnly && (!food.isAvailable || food.stockQuantity <= 0)) {
       return false;
     }
+    // Price range filter
+    if (priceFilter === 'under30' && food.price >= 30000) return false;
+    if (priceFilter === '30to45' && (food.price < 30000 || food.price > 45000)) return false;
+    if (priceFilter === 'above45' && food.price <= 45000) return false;
+
+    // Healthy / Low calorie filter (< 550 kcal or veggie)
+    if (healthyOnly) {
+      const isLowCal = food.calories ? food.calories <= 550 : false;
+      const isVeggie = food.categoryId === 'mon-chay';
+      const isCleanTag = food.tags.some((t) =>
+        ['healthy', 'chay', 'thanh mát', 'giàu đạm'].some((kw) => t.toLowerCase().includes(kw))
+      );
+      if (!isLowCal && !isVeggie && !isCleanTag) return false;
+    }
+
     return true;
   });
 
@@ -52,6 +71,8 @@ export const FoodGrid: React.FC = () => {
     setSearchQuery('');
     setSelectedCategoryId('all');
     setInStockOnly(false);
+    setPriceFilter('all');
+    setHealthyOnly(false);
   };
 
   if (filtered.length === 0) {

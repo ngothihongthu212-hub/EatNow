@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { FoodItem, Category } from '../../types';
+import { FoodItem, Category, Voucher } from '../../types';
+import { generateMySQLScript } from '../../utils/mysqlExport';
 import {
   BarChart3,
   Utensils,
@@ -18,6 +19,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  Database,
+  Download,
+  Copy,
+  Tag,
+  Code,
+  Table,
+  Check,
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -27,16 +35,45 @@ export const AdminDashboard: React.FC = () => {
     orders,
     reviews,
     users,
+    transactions,
+    vouchers,
     switchUser,
     adminAddFood,
     adminUpdateFood,
     adminDeleteFood,
     adminToggleFoodAvailability,
+    adminAddVoucher,
+    adminDeleteVoucher,
+    showToast,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'menu' | 'reviews' | 'users'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'menu' | 'reviews' | 'users' | 'vouchers' | 'database'>('overview');
   const [foodSearch, setFoodSearch] = useState('');
   const [foodCategoryFilter, setFoodCategoryFilter] = useState('all');
+
+  // Database Tab States
+  const [selectedTable, setSelectedTable] = useState<'users' | 'categories' | 'foods' | 'vouchers' | 'orders' | 'wallet_transactions' | 'reviews'>('foods');
+  const [dbSubTab, setDbSubTab] = useState<'data' | 'schema' | 'queries' | 'raw_sql'>('data');
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  // Voucher Form States
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [voucherForm, setVoucherForm] = useState<{
+    code: string;
+    title: string;
+    description: string;
+    discountType: 'fixed' | 'percent';
+    discountValue: number;
+    minOrderValue: number;
+    maxDiscount?: number;
+  }>({
+    code: '',
+    title: '',
+    description: '',
+    discountType: 'fixed',
+    discountValue: 10000,
+    minOrderValue: 35000,
+  });
 
   // Food Form Modal (Add / Edit)
   const [isFoodModalOpen, setIsFoodModalOpen] = useState(false);
@@ -303,6 +340,28 @@ export const AdminDashboard: React.FC = () => {
           }`}
         >
           Tài khoản hệ thống ({users.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('vouchers')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'vouchers'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Tag className="w-3.5 h-3.5 text-amber-500" />
+          <span>Mã giảm giá ({vouchers.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('database')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'database'
+              ? 'bg-amber-500 text-slate-950 shadow-sm font-extrabold'
+              : 'text-slate-700 hover:bg-slate-100 bg-amber-50/60 border border-amber-200/80'
+          }`}
+        >
+          <Database className="w-3.5 h-3.5 text-amber-700" />
+          <span>CSDL MySQL & Xuất .SQL</span>
         </button>
       </div>
 
@@ -738,6 +797,770 @@ export const AdminDashboard: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Vouchers Management */}
+      {activeTab === 'vouchers' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Tag className="w-5 h-5 text-amber-600" />
+                <span>Chương trình Khuyến mãi & Voucher sinh viên</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Quản lý các mã giảm giá áp dụng trực tiếp khi sinh viên thanh toán qua Ví CanteenGo
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsVoucherModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4 text-amber-400" />
+              <span>Tạo mã ưu đãi mới</span>
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
+                  <th className="py-3 px-4">Mã Voucher</th>
+                  <th className="py-3 px-4">Tên chương trình</th>
+                  <th className="py-3 px-4">Mức giảm</th>
+                  <th className="py-3 px-4">Đơn tối thiểu</th>
+                  <th className="py-3 px-4">Giảm tối đa</th>
+                  <th className="py-3 px-4 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {vouchers.map((v) => (
+                  <tr key={v.code} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3 px-4">
+                      <span className="font-mono font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-300/50">
+                        {v.code}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-bold text-slate-900">{v.title}</div>
+                      <div className="text-[11px] text-slate-500">{v.description}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="font-bold font-mono-nums text-emerald-600">
+                        {v.discountType === 'percent'
+                          ? `Giảm ${v.discountValue}%`
+                          : `Giảm ${v.discountValue.toLocaleString('vi-VN')}₫`}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 font-mono-nums text-slate-700">
+                      {v.minOrderValue.toLocaleString('vi-VN')}₫
+                    </td>
+                    <td className="py-3 px-4 font-mono-nums text-slate-500">
+                      {v.maxDiscount ? `${v.maxDiscount.toLocaleString('vi-VN')}₫` : 'Không giới hạn'}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        onClick={() => adminDeleteVoucher(v.code)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                        title="Xóa mã giảm giá"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 6: MySQL Database Studio & SQL Export */}
+      {activeTab === 'database' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-lg space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
+                  <Database className="w-4 h-4" />
+                  <span>CSDL Quan Hệ MySQL · Đồ Án Căn Tin EatNow</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold">
+                  Quản lý CSDL & Trình xuất tệp SQL (.sql)
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
+                  Hệ thống thiết kế theo chuẩn CSDL quan hệ với 7 bảng (Users, Categories, Foods, Orders, Order_Items, Transactions, Reviews). Khóa chính (PK), Khóa ngoại (FK) và dữ liệu thực tế sẵn sàng import vào phpMyAdmin / MySQL Workbench.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+                <button
+                  onClick={() => {
+                    const script = generateMySQLScript({
+                      users,
+                      categories,
+                      foods,
+                      orders,
+                      transactions,
+                      vouchers,
+                      reviews,
+                    });
+                    navigator.clipboard.writeText(script);
+                    setCopiedSql(true);
+                    showToast('Đã sao chép toàn bộ mã nguồn SQL vào Clipboard!', 'success');
+                    setTimeout(() => setCopiedSql(false), 2000);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition-all active:scale-95"
+                >
+                  {copiedSql ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span>Đã sao chép SQL</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 text-amber-400" />
+                      <span>Sao chép SQL</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    const script = generateMySQLScript({
+                      users,
+                      categories,
+                      foods,
+                      orders,
+                      transactions,
+                      vouchers,
+                      reviews,
+                    });
+                    const blob = new Blob([script], { type: 'text/sql;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'EatNow_MySQL_Database.sql';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    showToast('Đã tải xuống file EatNow_MySQL_Database.sql!', 'success');
+                  }}
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-md transition-all active:scale-95"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Tải file EatNow_MySQL.sql</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-Tabs */}
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80 overflow-x-auto text-xs">
+              <button
+                onClick={() => setDbSubTab('data')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1.5 ${
+                  dbSubTab === 'data' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <Table className="w-3.5 h-3.5" />
+                <span>Xem dữ liệu các bảng</span>
+              </button>
+              <button
+                onClick={() => setDbSubTab('schema')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1.5 ${
+                  dbSubTab === 'schema' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>Cấu trúc lược đồ (Schema & Keys)</span>
+              </button>
+              <button
+                onClick={() => setDbSubTab('queries')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1.5 ${
+                  dbSubTab === 'queries' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <Code className="w-3.5 h-3.5" />
+                <span>Truy vấn báo cáo mẫu (Queries)</span>
+              </button>
+              <button
+                onClick={() => setDbSubTab('raw_sql')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1.5 ${
+                  dbSubTab === 'raw_sql' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <span>Mã SQL hoàn chỉnh (.sql)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Subtab 1: Data Viewer */}
+          {dbSubTab === 'data' && (
+            <div className="space-y-4">
+              {/* Select Table Pills */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                {[
+                  { id: 'foods', label: 'foods', count: foods.length },
+                  { id: 'orders', label: 'orders', count: orders.length },
+                  { id: 'users', label: 'users', count: users.length },
+                  { id: 'categories', label: 'categories', count: categories.length },
+                  { id: 'vouchers', label: 'vouchers', count: vouchers.length },
+                  { id: 'wallet_transactions', label: 'wallet_transactions', count: transactions.length },
+                  { id: 'reviews', label: 'reviews', count: reviews.length },
+                ].map((tbl) => (
+                  <button
+                    key={tbl.id}
+                    onClick={() => setSelectedTable(tbl.id as any)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 border ${
+                      selectedTable === tbl.id
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                        : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <span className="font-mono">{tbl.label}</span>
+                    <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
+                      {tbl.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Data Table Container */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-xs max-h-[500px]">
+                {selectedTable === 'foods' && (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3">id (PK)</th>
+                        <th className="py-2.5 px-3">category_id (FK)</th>
+                        <th className="py-2.5 px-3">name</th>
+                        <th className="py-2.5 px-3">price</th>
+                        <th className="py-2.5 px-3">stock_qty</th>
+                        <th className="py-2.5 px-3">rating</th>
+                        <th className="py-2.5 px-3">calories</th>
+                        <th className="py-2.5 px-3">status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {foods.map((f) => (
+                        <tr key={f.id} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 text-amber-700 font-bold">{f.id}</td>
+                          <td className="py-2 px-3 text-indigo-700">{f.categoryId}</td>
+                          <td className="py-2 px-3 font-sans font-medium text-slate-900">{f.name}</td>
+                          <td className="py-2 px-3">{f.price.toLocaleString('vi-VN')}₫</td>
+                          <td className="py-2 px-3">{f.stockQuantity}</td>
+                          <td className="py-2 px-3">⭐ {f.rating}</td>
+                          <td className="py-2 px-3">{f.calories || f.nutrition?.calories || '-'} kcal</td>
+                          <td className="py-2 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] ${f.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
+                              {f.isAvailable ? 'ACTIVE' : 'INACTIVE'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {selectedTable === 'orders' && (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3">id (PK)</th>
+                        <th className="py-2.5 px-3">order_code</th>
+                        <th className="py-2.5 px-3">user_name</th>
+                        <th className="py-2.5 px-3">total_amount</th>
+                        <th className="py-2.5 px-3">pickup_slot</th>
+                        <th className="py-2.5 px-3">dining_option</th>
+                        <th className="py-2.5 px-3">status</th>
+                        <th className="py-2.5 px-3">created_at</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {orders.map((o) => (
+                        <tr key={o.id} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 text-amber-700 font-bold">{o.id}</td>
+                          <td className="py-2 px-3 text-slate-900 font-bold">#{o.orderCode}</td>
+                          <td className="py-2 px-3 font-sans font-medium">{o.userName}</td>
+                          <td className="py-2 px-3 text-emerald-600 font-bold">{o.totalAmount.toLocaleString('vi-VN')}₫</td>
+                          <td className="py-2 px-3">{o.pickupTimeSlot}</td>
+                          <td className="py-2 px-3 font-sans">{o.diningOption === 'dine_in' ? 'Ăn tại chỗ' : 'Mang đi'}</td>
+                          <td className="py-2 px-3">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 font-bold">
+                              {o.status}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-[11px] text-slate-400">{new Date(o.createdAt).toLocaleString('vi-VN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {selectedTable === 'users' && (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3">id (PK)</th>
+                        <th className="py-2.5 px-3">name</th>
+                        <th className="py-2.5 px-3">mssv</th>
+                        <th className="py-2.5 px-3">email</th>
+                        <th className="py-2.5 px-3">phone</th>
+                        <th className="py-2.5 px-3">role</th>
+                        <th className="py-2.5 px-3">wallet_balance</th>
+                        <th className="py-2.5 px-3">class_name</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {users.map((u) => (
+                        <tr key={u.id} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 text-amber-700 font-bold">{u.id}</td>
+                          <td className="py-2 px-3 font-sans font-medium">{u.name}</td>
+                          <td className="py-2 px-3">{u.mssv || 'NULL'}</td>
+                          <td className="py-2 px-3 text-slate-500">{u.email}</td>
+                          <td className="py-2 px-3">{u.phone}</td>
+                          <td className="py-2 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              u.role === 'admin' ? 'bg-purple-100 text-purple-800' : u.role === 'staff' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {u.role.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-amber-600 font-bold">{u.walletBalance.toLocaleString('vi-VN')}₫</td>
+                          <td className="py-2 px-3 font-sans text-slate-500">{u.className || u.department || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {selectedTable === 'wallet_transactions' && (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3">id (PK)</th>
+                        <th className="py-2.5 px-3">user_id (FK)</th>
+                        <th className="py-2.5 px-3">type</th>
+                        <th className="py-2.5 px-3">amount</th>
+                        <th className="py-2.5 px-3">description</th>
+                        <th className="py-2.5 px-3">timestamp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {transactions.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 text-amber-700 font-bold">{t.id}</td>
+                          <td className="py-2 px-3 text-indigo-700">{t.userId}</td>
+                          <td className="py-2 px-3 font-bold">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] ${t.type === 'deposit' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                              {t.type.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 font-bold">{t.type === 'deposit' ? '+' : '-'}{t.amount.toLocaleString('vi-VN')}₫</td>
+                          <td className="py-2 px-3 font-sans text-slate-700">{t.description}</td>
+                          <td className="py-2 px-3 text-[11px] text-slate-400">{new Date(t.timestamp).toLocaleString('vi-VN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {selectedTable === 'categories' && (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3">id (PK)</th>
+                        <th className="py-2.5 px-3">name</th>
+                        <th className="py-2.5 px-3">slug</th>
+                        <th className="py-2.5 px-3">description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {categories.map((c) => (
+                        <tr key={c.id} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 text-amber-700 font-bold">{c.id}</td>
+                          <td className="py-2 px-3 font-sans font-bold text-slate-900">{c.name}</td>
+                          <td className="py-2 px-3 text-slate-500">{c.slug}</td>
+                          <td className="py-2 px-3 font-sans text-slate-600">{c.description}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {selectedTable === 'vouchers' && (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3">code (PK)</th>
+                        <th className="py-2.5 px-3">title</th>
+                        <th className="py-2.5 px-3">discount_type</th>
+                        <th className="py-2.5 px-3">discount_value</th>
+                        <th className="py-2.5 px-3">min_order_value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {vouchers.map((v) => (
+                        <tr key={v.code} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 text-amber-800 font-bold">{v.code}</td>
+                          <td className="py-2 px-3 font-sans font-medium text-slate-900">{v.title}</td>
+                          <td className="py-2 px-3">{v.discountType}</td>
+                          <td className="py-2 px-3 text-emerald-600 font-bold">{v.discountValue}</td>
+                          <td className="py-2 px-3">{v.minOrderValue.toLocaleString('vi-VN')}₫</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {selectedTable === 'reviews' && (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3">id (PK)</th>
+                        <th className="py-2.5 px-3">food_id (FK)</th>
+                        <th className="py-2.5 px-3">user_name</th>
+                        <th className="py-2.5 px-3">rating</th>
+                        <th className="py-2.5 px-3">comment</th>
+                        <th className="py-2.5 px-3">created_at</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {reviews.map((r) => (
+                        <tr key={r.id} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 text-amber-700 font-bold">{r.id}</td>
+                          <td className="py-2 px-3 text-indigo-700">{r.foodId}</td>
+                          <td className="py-2 px-3 font-sans font-medium">{r.userName}</td>
+                          <td className="py-2 px-3 text-amber-500 font-bold">⭐ {r.rating}</td>
+                          <td className="py-2 px-3 font-sans text-slate-700">{r.comment}</td>
+                          <td className="py-2 px-3 text-[11px] text-slate-400">{new Date(r.createdAt).toLocaleString('vi-VN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Subtab 2: Schema definitions */}
+          {dbSubTab === 'schema' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-2">
+                <h4 className="font-bold text-slate-900 font-mono flex items-center gap-1.5">
+                  <Table className="w-4 h-4 text-amber-600" />
+                  <span>TABLE: foods</span>
+                </h4>
+                <div className="space-y-1 font-mono text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <div>• <strong>id</strong>: VARCHAR(50) [PK, NOT NULL]</div>
+                  <div>• <strong>category_id</strong>: VARCHAR(50) [FK &rarr; categories.id]</div>
+                  <div>• <strong>name</strong>: VARCHAR(150) [NOT NULL]</div>
+                  <div>• <strong>price</strong>: DECIMAL(12,2) [NOT NULL]</div>
+                  <div>• <strong>is_available</strong>: TINYINT(1) [DEFAULT 1]</div>
+                  <div>• <strong>stock_quantity</strong>: INT [DEFAULT 0]</div>
+                  <div>• <strong>rating</strong>: DECIMAL(3,1) [DEFAULT 5.0]</div>
+                  <div>• <strong>calories</strong>: INT NULL</div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-2">
+                <h4 className="font-bold text-slate-900 font-mono flex items-center gap-1.5">
+                  <Table className="w-4 h-4 text-indigo-600" />
+                  <span>TABLE: orders</span>
+                </h4>
+                <div className="space-y-1 font-mono text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <div>• <strong>id</strong>: VARCHAR(50) [PK, NOT NULL]</div>
+                  <div>• <strong>order_code</strong>: VARCHAR(20) [UNIQUE]</div>
+                  <div>• <strong>user_id</strong>: VARCHAR(50) [FK &rarr; users.id]</div>
+                  <div>• <strong>total_amount</strong>: DECIMAL(12,2) [NOT NULL]</div>
+                  <div>• <strong>pickup_time_slot</strong>: VARCHAR(50)</div>
+                  <div>• <strong>dining_option</strong>: ENUM('dine_in', 'takeaway')</div>
+                  <div>• <strong>status</strong>: ENUM(...)</div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-2">
+                <h4 className="font-bold text-slate-900 font-mono flex items-center gap-1.5">
+                  <Table className="w-4 h-4 text-emerald-600" />
+                  <span>TABLE: users</span>
+                </h4>
+                <div className="space-y-1 font-mono text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <div>• <strong>id</strong>: VARCHAR(50) [PK, NOT NULL]</div>
+                  <div>• <strong>name</strong>: VARCHAR(100) [NOT NULL]</div>
+                  <div>• <strong>mssv</strong>: VARCHAR(20) NULL</div>
+                  <div>• <strong>email</strong>: VARCHAR(100) [UNIQUE]</div>
+                  <div>• <strong>role</strong>: ENUM('customer', 'staff', 'admin')</div>
+                  <div>• <strong>wallet_balance</strong>: DECIMAL(14,2)</div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-2">
+                <h4 className="font-bold text-slate-900 font-mono flex items-center gap-1.5">
+                  <Table className="w-4 h-4 text-purple-600" />
+                  <span>TABLE: wallet_transactions</span>
+                </h4>
+                <div className="space-y-1 font-mono text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <div>• <strong>id</strong>: VARCHAR(50) [PK, NOT NULL]</div>
+                  <div>• <strong>user_id</strong>: VARCHAR(50) [FK &rarr; users.id]</div>
+                  <div>• <strong>type</strong>: ENUM('deposit', 'payment', 'refund')</div>
+                  <div>• <strong>amount</strong>: DECIMAL(12,2) [NOT NULL]</div>
+                  <div>• <strong>timestamp</strong>: DATETIME [DEFAULT CURRENT_TIMESTAMP]</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subtab 3: Sample Queries for Professor Review */}
+          {dbSubTab === 'queries' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900">
+                    Query 1: Thống kê Doanh thu và Số đơn hàng hoàn tất
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText("SELECT COUNT(id) AS total_orders, SUM(total_amount) AS total_revenue FROM orders WHERE status = 'completed';");
+                      showToast('Đã sao chép truy vấn 1', 'success');
+                    }}
+                    className="text-[11px] font-bold text-amber-700 hover:underline"
+                  >
+                    Sao chép
+                  </button>
+                </div>
+                <pre className="p-3 bg-slate-900 text-amber-300 rounded-xl font-mono text-xs overflow-x-auto">
+{`SELECT 
+    COUNT(id) AS total_orders, 
+    SUM(total_amount) AS total_revenue_vnd
+FROM orders 
+WHERE status = 'completed';`}
+                </pre>
+              </div>
+
+              <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900">
+                    Query 2: Thống kê Top 5 món bán chạy nhất bằng JOIN và GROUP BY
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`SELECT oi.food_id, f.name, SUM(oi.quantity) AS qty, SUM(oi.quantity * oi.price) AS revenue FROM order_items oi JOIN foods f ON oi.food_id = f.id JOIN orders o ON oi.order_id = o.id WHERE o.status != 'cancelled' GROUP BY oi.food_id, f.name ORDER BY qty DESC LIMIT 5;`);
+                      showToast('Đã sao chép truy vấn 2', 'success');
+                    }}
+                    className="text-[11px] font-bold text-amber-700 hover:underline"
+                  >
+                    Sao chép
+                  </button>
+                </div>
+                <pre className="p-3 bg-slate-900 text-amber-300 rounded-xl font-mono text-xs overflow-x-auto">
+{`SELECT 
+    oi.food_id, 
+    f.name AS food_name, 
+    SUM(oi.quantity) AS total_quantity_sold, 
+    SUM(oi.quantity * oi.price) AS total_revenue
+FROM order_items oi 
+JOIN foods f ON oi.food_id = f.id 
+JOIN orders o ON oi.order_id = o.id 
+WHERE o.status != 'cancelled' 
+GROUP BY oi.food_id, f.name 
+ORDER BY total_quantity_sold DESC 
+LIMIT 5;`}
+                </pre>
+              </div>
+            </div>
+          )}
+
+          {/* Subtab 4: Raw SQL */}
+          {dbSubTab === 'raw_sql' && (
+            <div className="space-y-2">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    const script = generateMySQLScript({
+                      users,
+                      categories,
+                      foods,
+                      orders,
+                      transactions,
+                      vouchers,
+                      reviews,
+                    });
+                    navigator.clipboard.writeText(script);
+                    showToast('Đã sao chép SQL', 'success');
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold"
+                >
+                  <Copy className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Sao chép toàn bộ</span>
+                </button>
+              </div>
+              <textarea
+                readOnly
+                rows={18}
+                value={generateMySQLScript({
+                  users,
+                  categories,
+                  foods,
+                  orders,
+                  transactions,
+                  vouchers,
+                  reviews,
+                })}
+                className="w-full p-4 bg-slate-900 text-emerald-300 font-mono text-xs rounded-2xl border border-slate-800 focus:outline-none"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Voucher Modal */}
+      {isVoucherModalOpen && (
+        <div className="fixed inset-0 z-70 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="text-base font-bold text-slate-900">
+                Tạo mã giảm giá / Voucher mới
+              </h3>
+              <button
+                onClick={() => setIsVoucherModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!voucherForm.code.trim() || !voucherForm.title.trim()) {
+                  showToast('Vui lòng nhập đầy đủ mã và tiêu đề voucher', 'error');
+                  return;
+                }
+                adminAddVoucher({
+                  code: voucherForm.code.trim().toUpperCase(),
+                  title: voucherForm.title.trim(),
+                  description: voucherForm.description.trim() || 'Ưu đãi đặt món sinh viên',
+                  discountType: voucherForm.discountType,
+                  discountValue: Number(voucherForm.discountValue),
+                  minOrderValue: Number(voucherForm.minOrderValue),
+                  maxDiscount: voucherForm.discountType === 'percent' ? Number(voucherForm.maxDiscount || 20000) : undefined,
+                });
+                setIsVoucherModalOpen(false);
+                setVoucherForm({
+                  code: '',
+                  title: '',
+                  description: '',
+                  discountType: 'fixed',
+                  discountValue: 10000,
+                  minOrderValue: 35000,
+                });
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Mã khuyến mãi (Code)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={voucherForm.code}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, code: e.target.value.toUpperCase() })}
+                  placeholder="Ví dụ: BANTHANG10, GIAM20K..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono font-bold uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Tiêu đề chương trình
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={voucherForm.title}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, title: e.target.value })}
+                  placeholder="Ví dụ: Giảm giá ngày hội sinh viên..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Loại giảm giá
+                  </label>
+                  <select
+                    value={voucherForm.discountType}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, discountType: e.target.value as any })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:outline-none"
+                  >
+                    <option value="fixed">Số tiền cố định (VNĐ)</option>
+                    <option value="percent">Phần trăm (%)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Giá trị giảm ({voucherForm.discountType === 'percent' ? '%' : 'VNĐ'})
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={voucherForm.discountValue}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, discountValue: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 font-mono-nums focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Giá trị đơn hàng tối thiểu (VNĐ)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="5000"
+                  value={voucherForm.minOrderValue}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, minOrderValue: Number(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 font-mono-nums focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Mô tả ngắn gọn
+                </label>
+                <input
+                  type="text"
+                  value={voucherForm.description}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, description: e.target.value })}
+                  placeholder="Áp dụng cho mọi sinh viên..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsVoucherModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-semibold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-xs"
+                >
+                  Tạo Voucher
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

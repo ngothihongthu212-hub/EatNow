@@ -14,6 +14,10 @@ export const MenuFilter: React.FC = () => {
     setInStockOnly,
     sortBy,
     setSortBy,
+    priceFilter,
+    setPriceFilter,
+    healthyOnly,
+    setHealthyOnly,
   } = useApp();
 
   // Calculate counts per category
@@ -76,20 +80,34 @@ export const MenuFilter: React.FC = () => {
           })}
         </div>
 
-        {/* In-stock Only Toggle */}
-        <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer select-none py-1">
-          <input
-            type="checkbox"
-            checked={inStockOnly}
-            onChange={(e) => setInStockOnly(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 rounded-sm cursor-pointer"
-          />
-          <span>Chỉ hiện món còn hàng</span>
-        </label>
+        {/* Quick Toggles */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setHealthyOnly(!healthyOnly)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${
+              healthyOnly
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400 hover:text-emerald-700'
+            }`}
+          >
+            <span>🥗 Eat Clean & Chay</span>
+          </button>
+
+          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 cursor-pointer select-none py-1">
+            <input
+              type="checkbox"
+              checked={inStockOnly}
+              onChange={(e) => setInStockOnly(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 rounded-sm cursor-pointer"
+            />
+            <span>Còn món</span>
+          </label>
+        </div>
       </div>
 
-      {/* Search & Sort Row */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      {/* Search, Price & Sort Row */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Search input */}
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -98,7 +116,7 @@ export const MenuFilter: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm theo tên món (ví dụ: Cơm sườn, Bún bò, Trà đào)..."
-            className="w-full pl-10 pr-9 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all"
+            className="w-full pl-10 pr-9 py-2 rounded-xl bg-white border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all"
           />
           {searchQuery && (
             <button
@@ -110,23 +128,36 @@ export const MenuFilter: React.FC = () => {
           )}
         </div>
 
-        {/* Sort Selector */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-slate-500 whitespace-nowrap hidden sm:inline">
-            Sắp xếp theo:
-          </span>
-          <div className="relative inline-block w-full sm:w-auto">
+        {/* Price & Sort Selectors */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Price Range */}
+          <div className="relative inline-block">
+            <select
+              value={priceFilter}
+              onChange={(e) => setPriceFilter(e.target.value as any)}
+              className="text-xs sm:text-sm font-medium bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 pr-7 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 cursor-pointer appearance-none"
+            >
+              <option value="all">Mọi mức giá</option>
+              <option value="under30">Dưới 30.000₫</option>
+              <option value="30to45">30.000₫ - 45.000₫</option>
+              <option value="above45">Trên 45.000₫</option>
+            </select>
+            <ArrowUpDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {/* Sort Selector */}
+          <div className="relative inline-block">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="w-full sm:w-auto text-xs sm:text-sm font-medium bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 pr-8 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 cursor-pointer appearance-none"
+              className="text-xs sm:text-sm font-medium bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 pr-7 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 cursor-pointer appearance-none"
             >
               <option value="popular">Bán chạy nhất</option>
               <option value="rating">Đánh giá cao nhất</option>
               <option value="price-asc">Giá: Thấp đến Cao</option>
               <option value="price-desc">Giá: Cao đến Thấp</option>
             </select>
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ArrowUpDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       </div>

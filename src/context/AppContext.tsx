@@ -9,6 +9,7 @@ import {
   WalletTransaction,
   Review,
   CartItem,
+  Voucher,
 } from '../types';
 import {
   INITIAL_CATEGORIES,
@@ -18,6 +19,7 @@ import {
   INITIAL_TRANSACTIONS,
   INITIAL_USERS,
   AVAILABLE_PICKUP_SLOTS,
+  INITIAL_VOUCHERS,
 } from '../data/initialData';
 
 interface ToastState {
@@ -48,6 +50,10 @@ interface AppContextType {
   setInStockOnly: (val: boolean) => void;
   sortBy: 'popular' | 'price-asc' | 'price-desc' | 'rating';
   setSortBy: (sort: 'popular' | 'price-asc' | 'price-desc' | 'rating') => void;
+  priceFilter: 'all' | 'under30' | '30to45' | 'above45';
+  setPriceFilter: (filter: 'all' | 'under30' | '30to45' | 'above45') => void;
+  healthyOnly: boolean;
+  setHealthyOnly: (val: boolean) => void;
   
   // Modals & Navigation
   isCartOpen: boolean;
@@ -62,8 +68,23 @@ interface AppContextType {
   setSelectedFood: (food: FoodItem | null) => void;
   selectedOrderForDetail: Order | null;
   setSelectedOrderForDetail: (order: Order | null) => void;
+  receiptOrder: Order | null;
+  setReceiptOrder: (order: Order | null) => void;
+  reviewingOrder: Order | null;
+  setReviewingOrder: (order: Order | null) => void;
   activeNavTab: 'menu' | 'my-orders' | 'staff-orders' | 'admin-dashboard';
   setActiveNavTab: (tab: 'menu' | 'my-orders' | 'staff-orders' | 'admin-dashboard') => void;
+
+  // Vouchers & Dining
+  vouchers: Voucher[];
+  appliedVoucher: Voucher | null;
+  applyVoucher: (code: string) => { success: boolean; message: string };
+  removeVoucher: () => void;
+  voucherDiscount: number;
+  diningOption: 'dine_in' | 'takeaway';
+  setDiningOption: (option: 'dine_in' | 'takeaway') => void;
+  tableNumber: string;
+  setTableNumber: (table: string) => void;
 
   // Actions
   addToCart: (food: FoodItem, quantity?: number, note?: string) => void;
@@ -71,6 +92,7 @@ interface AppContextType {
   removeFromCart: (foodId: string) => void;
   clearCart: () => void;
   cartTotal: number;
+  finalCartTotal: number;
   cartItemCount: number;
 
   createOrder: (pickupSlot: string) => Promise<{ success: boolean; orderId?: string; error?: string }>;
@@ -90,6 +112,8 @@ interface AppContextType {
   adminUpdateFood: (foodId: string, updates: Partial<FoodItem>) => void;
   adminDeleteFood: (foodId: string) => void;
   adminToggleFoodAvailability: (foodId: string) => void;
+  adminAddVoucher: (voucher: Voucher) => void;
+  adminDeleteVoucher: (code: string) => void;
 
   // Toasts
   toasts: ToastState[];
@@ -184,6 +208,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedCategoryId, setSelectedCategoryId] = useState('all');
   const [inStockOnly, setInStockOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'popular' | 'price-asc' | 'price-desc' | 'rating'>('popular');
+  const [priceFilter, setPriceFilter] = useState<'all' | 'under30' | '30to45' | 'above45'>('all');
+  const [healthyOnly, setHealthyOnly] = useState(false);
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -191,9 +217,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<Order | null>(null);
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+  const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
   const [activeNavTab, setActiveNavTab] = useState<'menu' | 'my-orders' | 'staff-orders' | 'admin-dashboard'>('menu');
 
+  // Vouchers & Dining
+  const [vouchers, setVouchers] = useState<Voucher[]>(() => {
+    const saved = localStorage.getItem('eatnow_vouchers');
+    return saved ? JSON.parse(saved) : INITIAL_VOUCHERS;
+  });
+  const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
+  const [diningOption, setDiningOption] = useState<'dine_in' | 'takeaway'>('takeaway');
+  const [tableNumber, setTableNumber] = useState<string>('Khu A1 - Bàn 04');
+
   const [toasts, setToasts] = useState<ToastState[]>([]);
+
+  // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem('eatnow_vouchers', JSON.stringify(vouchers));
+  }, [vouchers]);
 
   // Sync to localStorage
   useEffect(() => {
@@ -335,6 +377,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     0
   );
 
+  let voucherDiscount = 0;
+  if (appliedVoucher) {
+    if (cartTotal < appliedVoucher.minOrderValue) {
+      voucherDiscount = 0;
+    } else if (appliedVoucher.discountType === 'percent') {
+      const raw = Math.round((cartTotal * appliedVoucher.discountValue) / 100);
+      voucherDiscount = appliedVoucher.maxDiscount ? Math.min(raw, appliedVoucher.maxDiscount) : raw;
+    } else {
+      voucherDiscount = Math.min(cartTotal, appliedVoucher.discountValue);
+    }
+  }
+
+  const finalCartTotal = Math.max(0, cartTotal - voucherDiscount);
+
+  const applyVoucher = (code: string) => {
+    const found = vouchers.find((v) => v.code.toUpperCase() === code.trim().toUpperCase());
+    if (!found) {
+      showToast(`Mã giảm giá "${code}" không tồn tại hoặc đã hết hạn`, 'error');
+      return { success: false, message: 'Mã không tồn tại' };
+    }
+    if (cartTotal < found.minOrderValue) {
+      const msg = `Mã này áp dụng cho đơn từ ${found.minOrderValue.toLocaleString('vi-VN')}₫ (Giỏ hiện tại: ${cartTotal.toLocaleString('vi-VN')}₫)`;
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+    setAppliedVoucher(found);
+    showToast(`Áp dụng mã ${found.code} thành công: ${found.title}!`, 'success');
+    return { success: true, message: 'Thành công' };
+  };
+
+  const removeVoucher = () => {
+    setAppliedVoucher(null);
+    showToast('Đã gỡ mã giảm giá', 'info');
+  };
+
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   // Wallet operations
@@ -376,9 +453,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // Check wallet balance
-    if (currentUser.walletBalance < cartTotal) {
-      const errorMsg = `Số dư Ví CanteenGo không đủ (${currentUser.walletBalance.toLocaleString('vi-VN')}₫ / Cần ${cartTotal.toLocaleString('vi-VN')}₫). Vui lòng nạp thêm tiền!`;
+    // Check wallet balance against final discounted total
+    if (currentUser.walletBalance < finalCartTotal) {
+      const errorMsg = `Số dư Ví CanteenGo không đủ (${currentUser.walletBalance.toLocaleString('vi-VN')}₫ / Cần ${finalCartTotal.toLocaleString('vi-VN')}₫). Vui lòng nạp thêm tiền!`;
       showToast(errorMsg, 'error');
       return { success: false, error: errorMsg };
     }
@@ -400,7 +477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     // Deduct wallet balance
-    const newBalance = currentUser.walletBalance - cartTotal;
+    const newBalance = currentUser.walletBalance - finalCartTotal;
     const updatedUser = { ...currentUser, walletBalance: newBalance };
     setCurrentUser(updatedUser);
     setUsers((prev) =>
@@ -417,9 +494,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       orderId,
       orderCode,
       type: 'payment',
-      amount: cartTotal,
+      amount: finalCartTotal,
       timestamp: new Date().toISOString(),
-      description: `Thanh toán đơn hàng #${orderCode} qua Ví CanteenGo`,
+      description: `Thanh toán đơn hàng #${orderCode} qua Ví CanteenGo${appliedVoucher ? ` (Giảm ${voucherDiscount.toLocaleString('vi-VN')}₫)` : ''}`,
       status: 'success',
     };
     setTransactions((prev) => [tx, ...prev]);
@@ -440,8 +517,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         note: c.note,
         image: c.foodItem.image,
       })),
-      totalAmount: cartTotal,
+      totalAmount: finalCartTotal,
       pickupTimeSlot: pickupSlot,
+      diningOption: diningOption,
+      tableNumber: diningOption === 'dine_in' ? tableNumber : undefined,
+      voucherCode: appliedVoucher?.code,
+      discountAmount: voucherDiscount,
       status: 'paid_pending_confirm', // UC-02: Đã thanh toán - Chờ xác nhận
       createdAt: new Date().toISOString(),
       paymentMethod: 'wallet',
@@ -450,6 +531,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setOrders((prev) => [newOrder, ...prev]);
     clearCart();
+    setAppliedVoucher(null);
     setIsCartOpen(false);
 
     showToast(`Đặt món thành công! Mã đơn: #${orderCode}. Khung giờ nhận: ${pickupSlot}`, 'success');
@@ -730,6 +812,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const adminAddVoucher = (voucher: Voucher) => {
+    setVouchers((prev) => {
+      const exists = prev.some((v) => v.code.toUpperCase() === voucher.code.toUpperCase());
+      if (exists) {
+        showToast(`Mã voucher ${voucher.code} đã tồn tại!`, 'error');
+        return prev;
+      }
+      showToast(`Đã thêm mã ưu đãi ${voucher.code} thành công`, 'success');
+      return [voucher, ...prev];
+    });
+  };
+
+  const adminDeleteVoucher = (code: string) => {
+    setVouchers((prev) => prev.filter((v) => v.code !== code));
+    showToast(`Đã xóa mã voucher ${code}`, 'info');
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -753,6 +852,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setInStockOnly,
         sortBy,
         setSortBy,
+        priceFilter,
+        setPriceFilter,
+        healthyOnly,
+        setHealthyOnly,
 
         isCartOpen,
         setIsCartOpen,
@@ -766,14 +869,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedFood,
         selectedOrderForDetail,
         setSelectedOrderForDetail,
+        receiptOrder,
+        setReceiptOrder,
+        reviewingOrder,
+        setReviewingOrder,
         activeNavTab,
         setActiveNavTab,
+
+        vouchers,
+        appliedVoucher,
+        applyVoucher,
+        removeVoucher,
+        voucherDiscount,
+        diningOption,
+        setDiningOption,
+        tableNumber,
+        setTableNumber,
 
         addToCart,
         updateCartQuantity,
         removeFromCart,
         clearCart,
         cartTotal,
+        finalCartTotal,
         cartItemCount,
 
         createOrder,
@@ -792,6 +910,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         adminUpdateFood,
         adminDeleteFood,
         adminToggleFoodAvailability,
+        adminAddVoucher,
+        adminDeleteVoucher,
 
         toasts,
         showToast,

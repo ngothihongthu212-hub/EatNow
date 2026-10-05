@@ -23,6 +23,11 @@ export const WalletPaymentModal: React.FC<WalletPaymentModalProps> = ({
   const {
     currentUser,
     cartTotal,
+    finalCartTotal,
+    voucherDiscount,
+    appliedVoucher,
+    diningOption,
+    tableNumber,
     cart,
     createOrder,
     depositWallet,
@@ -32,8 +37,9 @@ export const WalletPaymentModal: React.FC<WalletPaymentModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const isBalanceSufficient = currentUser.walletBalance >= cartTotal;
-  const deficit = cartTotal - currentUser.walletBalance;
+  const amountToPay = finalCartTotal;
+  const isBalanceSufficient = currentUser.walletBalance >= amountToPay;
+  const deficit = amountToPay - currentUser.walletBalance;
 
   const handleConfirmPayment = async () => {
     setErrorMessage(null);
@@ -41,7 +47,7 @@ export const WalletPaymentModal: React.FC<WalletPaymentModalProps> = ({
       setErrorMessage(
         `Số dư Ví CanteenGo không đủ (${currentUser.walletBalance.toLocaleString(
           'vi-VN'
-        )}₫ / Cần ${cartTotal.toLocaleString('vi-VN')}₫). Vui lòng nạp thêm tiền!`
+        )}₫ / Cần ${amountToPay.toLocaleString('vi-VN')}₫). Vui lòng nạp thêm tiền!`
       );
       return;
     }
@@ -101,6 +107,12 @@ export const WalletPaymentModal: React.FC<WalletPaymentModalProps> = ({
               </span>
             </div>
             <div className="flex justify-between text-slate-600 items-center">
+              <span>Hình thức:</span>
+              <span className="font-semibold text-slate-800">
+                {diningOption === 'dine_in' ? `🍽️ Ăn tại quầy (${tableNumber})` : '🥡 Đóng hộp mang đi'}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-600 items-center">
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-amber-600" />
                 <span>Giờ hẹn lấy món:</span>
@@ -109,10 +121,20 @@ export const WalletPaymentModal: React.FC<WalletPaymentModalProps> = ({
                 {pickupSlot}
               </span>
             </div>
+
+            {voucherDiscount > 0 && (
+              <div className="flex justify-between text-emerald-600 font-semibold pt-1 border-t border-slate-200">
+                <span>Voucher giảm giá ({appliedVoucher?.code}):</span>
+                <span className="font-mono-nums">
+                  -{voucherDiscount.toLocaleString('vi-VN')}₫
+                </span>
+              </div>
+            )}
+
             <div className="flex justify-between text-slate-900 pt-2 border-t border-slate-200 text-sm font-bold">
               <span>Tổng tiền cần thanh toán:</span>
               <span className="text-base font-extrabold font-mono-nums text-amber-600">
-                {cartTotal.toLocaleString('vi-VN')}₫
+                {amountToPay.toLocaleString('vi-VN')}₫
               </span>
             </div>
           </div>
@@ -147,7 +169,7 @@ export const WalletPaymentModal: React.FC<WalletPaymentModalProps> = ({
                 <span>
                   Số dư hợp lệ. Sau thanh toán còn:{' '}
                   <strong className="font-mono-nums">
-                    {(currentUser.walletBalance - cartTotal).toLocaleString('vi-VN')}₫
+                    {(currentUser.walletBalance - amountToPay).toLocaleString('vi-VN')}₫
                   </strong>
                 </span>
               </div>
@@ -239,7 +261,7 @@ export const WalletPaymentModal: React.FC<WalletPaymentModalProps> = ({
               <span>Đang trừ ví...</span>
             ) : (
               <>
-                <span>Xác nhận trừ {cartTotal.toLocaleString('vi-VN')}₫</span>
+                <span>Xác nhận trừ {amountToPay.toLocaleString('vi-VN')}₫</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </>
             )}
